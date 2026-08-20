@@ -11,7 +11,7 @@ from pathlib import Path
 import zipfile
 
 # Backend URL from frontend/.env
-BASE_URL = "https://pdf-support-stack.preview.emergentagent.com/api/pdf"
+BASE_URL = "https://lovepdf-tools-1.preview.emergentagent.com/api/pdf"
 
 # Test results tracking
 passed = 0

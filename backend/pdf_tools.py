@@ -5,6 +5,7 @@ purely in the browser. Each endpoint accepts an uploaded file (multipart)
 and streams back the processed result.
 """
 import os
+import re
 import shutil
 import uuid
 import subprocess
@@ -95,13 +96,21 @@ async def inspect_pdf(background_tasks: BackgroundTasks, file: UploadFile = File
     try:
         src = await _save_upload(file, job)
         legacy = _is_legacy_hindi(src)
-        ratio = _devanagari_ratio(src)
+        has_text = _has_text_layer(src)
+        ratio = _devanagari_ratio(src) if has_text else 0.0
+        looks_english = _looks_like_english(src) if has_text else False
         fonts = sorted(_pdf_font_names(src))[:20]
         _cleanup(job)
-        return JSONResponse({"legacy_hindi": legacy, "devanagari_ratio": ratio, "fonts": fonts})
+        return JSONResponse({
+            "legacy_hindi": legacy,
+            "has_text": has_text,
+            "devanagari_ratio": ratio,
+            "looks_english": looks_english,
+            "fonts": fonts,
+        })
     except Exception:
         _cleanup(job)
-        return JSONResponse({"legacy_hindi": False, "devanagari_ratio": 0.0, "fonts": []})
+        return JSONResponse({"legacy_hindi": False, "has_text": False, "devanagari_ratio": 0.0, "looks_english": False, "fonts": []})
 
 
 # ---------- Office / HTML -> PDF ----------
@@ -422,6 +431,41 @@ def _devanagari_ratio(src: Path) -> float:
     except Exception:
         return 0.0
     return (deva / total) if total else 0.0
+
+
+# A small set of very common English words. Real English prose is ~30-50%% of
+# these; legacy Kruti/DevLys text (ASCII-mapped Devanagari) contains virtually
+# none, so this cleanly separates "genuine English" from "legacy Hindi encoded
+# as ASCII" without relying on the font name.
+_COMMON_EN = {
+    "the", "and", "of", "to", "in", "is", "a", "for", "that", "on", "with",
+    "as", "are", "be", "this", "by", "or", "at", "it", "from", "an", "was",
+    "not", "which", "have", "has", "had", "will", "would", "can", "could",
+    "all", "you", "your", "we", "our", "their", "they", "he", "she", "his",
+    "her", "but", "if", "so", "do", "does", "been", "were", "more", "one",
+    "also", "may", "such", "its", "into", "than", "when", "who", "what",
+    "how", "about", "page", "document", "name", "date", "total", "no", "yes",
+    "there", "these", "some", "other", "only", "over", "then", "them", "out",
+}
+
+
+def _looks_like_english(src: Path) -> bool:
+    """Heuristic: True if the extracted text layer reads like genuine English
+    prose (many common English words). Used to avoid mistaking a normal English
+    PDF for legacy ASCII-mapped Hindi when the Devanagari ratio is ~0."""
+    text = ""
+    try:
+        import pdfplumber
+        with pdfplumber.open(str(src)) as pdf:
+            for page in pdf.pages[:5]:
+                text += (page.extract_text() or "") + " "
+    except Exception:
+        return False
+    toks = re.findall(r"[a-zA-Z]{2,}", text.lower())
+    if len(toks) < 3:
+        return False
+    hits = sum(1 for t in toks if t in _COMMON_EN)
+    return (hits / len(toks)) >= 0.12
 
 
 def _kruti_pdf_to_docx(src: Path, job: Path, out: Path) -> bool:

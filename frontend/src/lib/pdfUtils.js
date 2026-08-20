@@ -1,9 +1,53 @@
 import { PDFDocument, degrees, rgb, StandardFonts } from 'pdf-lib';
+// @pdf-lib/fontkit's Indic (Devanagari) shaper is compiled with generator
+// functions that expect a global `regeneratorRuntime`; importing this polyfill
+// defines it so Hindi text shaping works in the browser bundle.
+import 'regenerator-runtime/runtime';
+import fontkit from '@pdf-lib/fontkit';
+import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Use a CDN worker that matches the installed pdfjs-dist version.
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+
+// ---- Unicode (Devanagari / Hindi) font support for the PDF writer ----
+// pdf-lib's built-in StandardFonts (Helvetica/Times/Courier) only cover WinAnsi
+// (Latin) glyphs, so editing Hindi text and saving produced '?' placeholders.
+// We bundle a Devanagari TTF and embed it (via fontkit, which performs proper
+// Indic OpenType shaping) whenever the text contains non-Latin characters.
+const DEVANAGARI_FONT_URL = `${process.env.PUBLIC_URL || ''}/fonts/Lohit-Devanagari.ttf`;
+let _uniFontBytesPromise = null;
+const loadUnicodeFontBytes = () => {
+  if (!_uniFontBytesPromise) {
+    _uniFontBytesPromise = fetch(DEVANAGARI_FONT_URL)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Font load failed: ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .catch((err) => { _uniFontBytesPromise = null; throw err; });
+  }
+  return _uniFontBytesPromise;
+};
+
+// True when a string contains characters outside Latin-1 (e.g. Devanagari),
+// which the built-in StandardFonts cannot encode.
+export const needsUnicodeFont = (t) => /[^\u0000-\u00FF]/.test(t || '');
+
+// Returns a helper bound to a specific PDFDocument that lazily embeds the
+// Devanagari font once and reuses it for every subsequent string.
+const makeUnicodeFontGetter = (docPdf) => {
+  let embedded = null;
+  let registered = false;
+  return async () => {
+    if (!embedded) {
+      if (!registered) { docPdf.registerFontkit(fontkit); registered = true; }
+      const bytes = await loadUnicodeFontBytes();
+      embedded = await docPdf.embedFont(bytes, { subset: true });
+    }
+    return embedded;
+  };
+};
 
 export const readFile = (file) =>
   new Promise((resolve, reject) => {
@@ -23,6 +67,20 @@ export const download = (bytes, filename, type = 'application/pdf') => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+};
+
+// Package multiple rendered images into a single ZIP and download it once.
+// Triggering many individual downloads is unreliable (browsers block all but
+// the first few), so multi-page PDF->images now always ships one .zip.
+export const downloadImagesAsZip = async (images, zipName = 'images.zip') => {
+  const zip = new JSZip();
+  const pad = String(images.length).length;
+  images.forEach((im, i) => {
+    const fallback = `page_${String(i + 1).padStart(pad, '0')}.jpg`;
+    zip.file(im.name || fallback, im.blob);
+  });
+  const blob = await zip.generateAsync({ type: 'blob' });
+  download(blob, zipName, 'application/zip');
 };
 
 export const getPageCount = async (file) => {
@@ -455,16 +513,23 @@ export const applyPdfTextEdits = async (file, edits) => {
     return cache[key];
   };
 
+  const getUniFont = makeUnicodeFontGetter(docPdf);
   for (const e of edits) {
     const page = pages[e.pageIndex];
     if (!page) continue;
-    const font = await pick(e);
-    const size = e.size || 12;
     const text = e.text || '';
-    const safe = (t) => {
-      try { return font.widthOfTextAtSize(t, size); } catch { return (t.length * size * 0.5); }
+    const font = needsUnicodeFont(text) ? await getUniFont() : await pick(e);
+    const measure = (t, sz) => {
+      try { return font.widthOfTextAtSize(t, sz); } catch { return (t.length * sz * 0.5); }
     };
-    const tw = safe(text);
+    let size = e.size || 12;
+    // Shrink-to-fit: keep the (possibly converted / edited) text within its
+    // original box width so it doesn't overflow onto neighbouring text.
+    if (e.widthPt && e.widthPt > 1) {
+      const natural = measure(text, size);
+      if (natural > e.widthPt) size = Math.max(4, size * (e.widthPt / natural));
+    }
+    const tw = measure(text, size);
     const boxW = e.widthPt || tw;
     let drawX = e.xPt;
     if (e.align === 'center') drawX = e.xPt + (boxW - tw) / 2;
@@ -482,11 +547,17 @@ export const applyPdfTextEdits = async (file, edits) => {
     });
 
     const col = hexToRgb(e.color);
-    const drawWith = (txt) => page.drawText(txt, { x: drawX, y: e.yPt, size, font, color: col });
     try {
-      drawWith(text);
+      page.drawText(text, { x: drawX, y: e.yPt, size, font, color: col });
     } catch (err) {
-      drawWith(text.replace(/[^\x20-\x7E]/g, '?'));
+      // Last resort: embed the Unicode (Devanagari) font and retry so Hindi
+      // text renders instead of being stripped to '?'.
+      try {
+        const uni = await getUniFont();
+        page.drawText(text, { x: drawX, y: e.yPt, size, font: uni, color: col });
+      } catch (err2) {
+        page.drawText(text.replace(/[^\x20-\x7E]/g, '?'), { x: drawX, y: e.yPt, size, font, color: col });
+      }
     }
     if (e.underline) {
       page.drawRectangle({ x: drawX, y: e.yPt - size * 0.12, width: tw, height: Math.max(0.6, size * 0.06), color: col });
@@ -514,15 +585,21 @@ export const applyPdfEdits = async (file, { texts = [], shapes = [], images = []
     return cache[key];
   };
   const px = (n, ptW, ptH) => ({ x: n.x * ptW, w: n.w * ptW, h: n.h * ptH, y: ptH - n.y * ptH - n.h * ptH });
+  const getUniFont = makeUnicodeFontGetter(docPdf);
 
   for (const e of texts) {
     const page = pages[e.pageIndex];
     if (!page) continue;
-    const font = await pick(e);
-    const size = e.size || 12;
     const text = e.text || '';
-    const safe = (t) => { try { return font.widthOfTextAtSize(t, size); } catch { return t.length * size * 0.5; } };
-    const tw = safe(text);
+    const font = needsUnicodeFont(text) ? await getUniFont() : await pick(e);
+    const measure = (t, sz) => { try { return font.widthOfTextAtSize(t, sz); } catch { return t.length * sz * 0.5; } };
+    let size = e.size || 12;
+    // Shrink-to-fit within the original box width (see applyPdfTextEdits).
+    if (e.widthPt && e.widthPt > 1) {
+      const natural = measure(text, size);
+      if (natural > e.widthPt) size = Math.max(4, size * (e.widthPt / natural));
+    }
+    const tw = measure(text, size);
     const boxW = e.widthPt || tw;
     let drawX = e.xPt;
     if (e.align === 'center') drawX = e.xPt + (boxW - tw) / 2;
@@ -532,7 +609,10 @@ export const applyPdfEdits = async (file, { texts = [], shapes = [], images = []
     page.drawRectangle({ x: left, y: e.yPt - size * 0.30, width: right - left, height: size * 1.34, color: hexToRgb(e.bg) });
     const col = hexToRgb(e.color);
     try { page.drawText(text, { x: drawX, y: e.yPt, size, font, color: col }); }
-    catch { page.drawText(text.replace(/[^\x20-\x7E]/g, '?'), { x: drawX, y: e.yPt, size, font, color: col }); }
+    catch {
+      try { const uni = await getUniFont(); page.drawText(text, { x: drawX, y: e.yPt, size, font: uni, color: col }); }
+      catch { page.drawText(text.replace(/[^\x20-\x7E]/g, '?'), { x: drawX, y: e.yPt, size, font, color: col }); }
+    }
     if (e.underline) page.drawRectangle({ x: drawX, y: e.yPt - size * 0.12, width: tw, height: Math.max(0.6, size * 0.06), color: col });
   }
 

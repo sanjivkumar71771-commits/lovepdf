@@ -69,3 +69,14 @@ ilovepdf-style PDF tools website (repo: sanjusaharan10704-svg/LOVEPDF). Bug fix 
 - BUG FIX: /api/image/remove-bg (rembg) was 500 due to missing pymatting/pooch/scikit-image — installed + added to requirements.txt. Fixes SignPage "Image" tab + Remove Background tool.
 - ToolPage.jsx merged from LOVEPDFDEV2026: state clears on tool switch; improved multi-file preview grid (thumbnails, numbered badges, drag-to-reorder, inline Add-more) for Merge/JPG-to-PDF. Edit PDF, Sign PDF, image_tools (keyless rembg) preserved.
 - KNOWN: Editing Hindi text and SAVING via Edit PDF export uses pdf-lib standard fonts (no Devanagari embedding) — display/edit is fixed, but exporting edited Devanagari into the PDF needs a future embedded-font step. OCR of dotted form-lines can still add minor noise (legacy PDFs now use the clean deterministic converter instead).
+
+## June 2026 — GitHub repo (rajnyol) merge + P0 Hindi export fix (this session)
+Merged bug fixes from https://github.com/nyolraj3188-creator/rajnyol (verified via testing_agent iteration_6: backend 6/6, frontend 4/4 flows).
+- **P0 FIXED — Edit PDF Hindi export**: `frontend/src/lib/pdfUtils.js` now embeds a bundled Devanagari font (`frontend/public/fonts/Lohit-Devanagari.ttf`) via `@pdf-lib/fontkit` + `regenerator-runtime` whenever text has non-Latin chars (`needsUnicodeFont`). Edited Hindi text now exports correctly in the downloaded PDF (was `?`/boxes before). Shrink-to-fit keeps converted Hindi within its original box width (no overflow, no size jump on click). New deps: `@pdf-lib/fontkit@1.1.1`, `jszip@3.10.1`, `regenerator-runtime@0.14.1`.
+- **Edit PDF auto legacy detection**: `EditPdfPage.jsx` uses `/api/pdf/inspect` fields — `legacy = legacy_hindi || (has_text && devanagari_ratio<0.15 && !looks_english)` — so Kruti/DevLys PDFs convert even when font name isn't a known legacy token; English PDFs are safeguarded.
+- **Backend `/api/pdf/inspect`**: now returns `has_text`, `looks_english` (new `_looks_like_english()` common-word heuristic) alongside `legacy_hindi`, `devanagari_ratio`, `fonts`.
+- **PDF to JPG ZIP**: `pdf.downloadImagesAsZip` (jszip) bundles all rendered pages into ONE `.zip` (avoids browser multi-download blocking). ToolPage shows "Download All Images (ZIP)" + spinner, plus per-page "Download This Image" with "Page N" badges. data-testids: download-all-zip-button, download-image-button-{i}, page-badge-{i}.
+- **Home**: "Most popular tools" now curated incl. PDF to JPG (POPULAR_SLUGS).
+- **Footer**: clickable `mailto:lovepdf.support@gmail.com` on every page.
+- SignPage / image_tools.py unchanged (no repo diff). Admin/blog CRUD not retested (unchanged since iteration 5, 19/19).
+- Non-blocking notes (optional backlog): backend pdf-to-word/excel legacy conversion still keys off font name (`_is_legacy_hindi`); Edit-PDF export leaves original text in the hidden text layer under the cover box (true redaction is future work).

@@ -29,6 +29,18 @@ const FAMILIES = [
 ];
 const famCss = (id) => (FAMILIES.find((f) => f.id === id) || FAMILIES[0]).css;
 
+// Measure how wide a string renders (CSS px) for the given style, so an edited
+// line — especially converted Devanagari, which is wider than the original
+// ASCII/Latin glyphs — can be shrunk to fit its original box instead of
+// overflowing onto the next column / line.
+let _measureCanvas = null;
+const measureTextWidthPx = (text, sizePx, st) => {
+  if (!_measureCanvas) _measureCanvas = document.createElement('canvas');
+  const ctx = _measureCanvas.getContext('2d');
+  ctx.font = `${st.italic ? 'italic ' : ''}${st.bold ? '700' : '400'} ${sizePx}px ${famCss(st.family)}`;
+  return ctx.measureText(text || '').width;
+};
+
 const StyleToggle = ({ active, onClick, title, children }) => (
   <button type="button" onClick={onClick} title={title}
     className={`grid place-items-center w-9 h-9 rounded-lg border transition-colors ${active ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
@@ -90,11 +102,21 @@ const EditPdfPage = () => {
     setPageIndex(0); setEdits({}); setSelectedId(null); setResult(null); setZoom(1);
     setObjects([]); setSelectedObjId(null);
     // Ask the backend whether this PDF uses a legacy (non-Unicode) Hindi font.
+    // Content-based auto-detection: convert Kruti/DevLys ASCII text to Unicode when
+    // the font is a known legacy one, OR the text layer is non-empty yet has almost
+    // no real Devanagari (devanagari_ratio < 0.15) — a strong signal of a legacy
+    // encoding even when the font name isn't in our known list. A safeguard skips
+    // genuine English PDFs (which also have ~0 Devanagari) so their text isn't
+    // garbled by the Kruti->Unicode mapping.
     let legacy = false;
     try {
       const fd = new FormData(); fd.append('file', f);
       const r = await fetch(`${BACKEND}/api/pdf/inspect`, { method: 'POST', body: fd });
-      if (r.ok) { const d = await r.json(); legacy = !!d.legacy_hindi; }
+      if (r.ok) {
+        const d = await r.json();
+        const ratio = typeof d.devanagari_ratio === 'number' ? d.devanagari_ratio : 0;
+        legacy = !!d.legacy_hindi || (!!d.has_text && ratio < 0.15 && !d.looks_english);
+      }
     } catch (e) { /* detection optional */ }
     setLegacyHindi(legacy);
     await loadPage(f, 0, legacy);
@@ -417,7 +439,7 @@ const EditPdfPage = () => {
                 </button>
               ))}
             </div>
-            <button onClick={save} disabled={busy || changeCount === 0}
+            <button onClick={save} disabled={busy || changeCount === 0} data-testid="edit-save-button"
               className="order-2 sm:order-3 inline-flex items-center gap-2 btn-primary text-white font-semibold px-5 py-2.5 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save changes{changeCount > 0 ? ` (${changeCount})` : ''}
             </button>
@@ -461,13 +483,29 @@ const EditPdfPage = () => {
                         const st = entry ? entry.style : deriveStyle(it);
                         const text = entry ? entry.text : it.str;
                         const active = selectedId === it.id || (entry && entry.touched);
-                        const fontPx = st.size * scale;
+                        // Keep the on-page glyph size IDENTICAL to the original when
+                        // the user hasn't manually changed the size: st.size starts as
+                        // the rounded point size, so scale the exact original pixel
+                        // height (it.fontPx) by (current size / baseline size). When
+                        // unchanged this factor is 1 -> no size jump on click/edit.
+                        const baseSize = Math.max(6, Math.round(it.sizePt));
+                        let fontPx = it.fontPx * (st.size / baseSize);
+                        // Shrink-to-fit: if the (edited/converted) text is wider than
+                        // its original box, reduce the font size so it fits instead of
+                        // overflowing. Only shrinks — never enlarges — so text that
+                        // already fits keeps its exact original size.
+                        if (it.widthPx > 4) {
+                          const measured = measureTextWidthPx(text, fontPx * 0.92, st);
+                          if (measured > it.widthPx) {
+                            fontPx = Math.max(5, fontPx * (it.widthPx / measured));
+                          }
+                        }
                         const baselinePx = it.top + it.fontPx;
                         const top = baselinePx - fontPx;
                         if (active) {
-                          const w = Math.max(it.widthPx, (text.length + 1) * fontPx * 0.5, 14);
+                          const w = Math.max(it.widthPx, fontPx, 14);
                           return (
-                            <input key={it.id} value={text}
+                            <input key={it.id} value={text} data-testid="pdf-text-input"
                               onChange={(e) => patchText(it.id, e.target.value)}
                               onFocus={() => selectItem(it)}
                               spellCheck={false}
@@ -486,7 +524,7 @@ const EditPdfPage = () => {
                           );
                         }
                         return (
-                          <div key={it.id} onClick={() => selectItem(it)} title="Click to edit"
+                          <div key={it.id} onClick={() => selectItem(it)} title="Click to edit" data-testid="pdf-text-run"
                             style={{
                               position: 'absolute', left: it.left, top: it.top,
                               width: it.widthPx, height: it.fontPx * 1.25,

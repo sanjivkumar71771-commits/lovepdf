@@ -244,6 +244,28 @@ frontend:
         -working: "NA"
         -agent: "main"
         -comment: "Routes /admin/login and /admin added. Login page renders correctly (screenshot verified). Frontend testing pending user approval."
+  - task: "Edit PDF Hindi/Devanagari export (embed Lohit-Devanagari TTF via fontkit in pdf-lib)"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/lib/pdfUtils.js, frontend/src/pages/EditPdfPage.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Merged P0 fix from GitHub repo rajnyol. pdfUtils.applyPdfEdits/applyPdfTextEdits now embed a bundled Devanagari font (public/fonts/Lohit-Devanagari.ttf) via @pdf-lib/fontkit + regenerator-runtime whenever text has non-Latin chars (needsUnicodeFont). Shrink-to-fit keeps converted Hindi within original box width. EditPdfPage improves legacy detection using /inspect has_text + devanagari_ratio<0.15 + !looks_english. Added deps @pdf-lib/fontkit, jszip, regenerator-runtime. Needs E2E: upload Hindi PDF, edit text, Save/Download -> exported PDF shows real Devanagari (not '?'/boxes)."
+  - task: "PDF to JPG -> Download All as single ZIP (jszip) + per-image download"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/ToolPage.jsx, frontend/src/lib/pdfUtils.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Merged from repo. pdf.downloadImagesAsZip bundles all rendered PDF pages into one .zip (avoids browser multi-download blocking). ToolPage shows 'Download All Images (ZIP)' with zipping spinner + per-page 'Download This Image'. Needs E2E on /tool/pdf-to-jpg."
 
 metadata:
   created_by: "main_agent"
@@ -252,7 +274,10 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Edit PDF Hindi/Devanagari export (embed Lohit-Devanagari TTF via fontkit in pdf-lib)"
+    - "PDF to JPG -> Download All as single ZIP (jszip) + per-image download"
+    - "PDF inspect endpoint new fields (has_text, looks_english) + regression"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"

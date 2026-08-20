@@ -1,0 +1,231 @@
+<analysis>**original_problem_statement**: 
+The user wants to publish the  application and integrate an Admin Panel from a specific GitHub repository (). They also requested merging specific UI bug fixes (Tool Page state clear, better thumbnails) and PDF conversion logic (LibreOffice normalization, Tesseract OCR for scanned PDFs, Hindi language packs) from the repo, **without overriding or breaking** existing features like  and . Later, they reported bugs regarding Hindi legacy fonts (Kruti Dev) showing as gibberish in PDF-to-Word and Edit PDF, and an image background removal bug in the Sign Page.
+
+**PRODUCT REQUIREMENTS**:
+1. Admin Panel integration (SEO, Blog CMS, Settings) with JWT Auth.
+2. Robust PDF-to-Word/Excel conversions using , , and  for cleanup.
+3. Accurate Hindi PDF conversion (including legacy Kruti Dev ASCII to Unicode mapping).
+4. Bug-free UI transitions between tools and a functional image background remover ().
+
+**User's preferred language**: Hindi / Hinglish. 
+**INSTRUCT NEXT AGENT:** You MUST respond to the user in Hinglish/Hindi based on their messages.
+
+**what currently exists?** 
+A Full-Stack application (React + FastAPI + MongoDB). It features various PDF/Image tools (PDF to Word/Excel, Edit PDF, Sign PDF). It now includes a fully functional Admin Panel (Dashboard, SEO management, Blog system). The backend handles robust PDF processing utilizing system tools (LibreOffice, Ghostscript, Tesseract) and handles legacy Hindi fonts (Kruti Dev) by converting ASCII to Unicode deterministically via custom scripts ( and  JS library). 
+
+**Last working item**:
+- **Last item agent was working**: Fixing the  API which was failing with a 500 error on the  Image tab due to missing / dependencies for . After fixing this, the agent summarized all work and explicitly asked the user two questions: 1) Should the agent run automated frontend tests? 2) Should the agent implement custom Devanagari font embedding in  so that edited Hindi text actually saves/exports correctly in the PDF (currently it only displays correctly on the UI).
+- **Status**: USER VERIFICATION PENDING
+- **Agent Testing Done**: Y (Backend Deep Testing passed 19/19)
+- **Which testing method agent to use?**: Frontend testing agent (Waiting on user approval).
+- **User Testing Done**: N
+
+**All Pending/In progress Issue list**:
+Issue 1: Edit PDF Hindi Export / Save Bug (Priority: P0)
+- **Attempted fixes**: The agent fixed the display and editability of Kruti Dev/legacy Hindi fonts on the UI using a custom Unicode converter.
+- **Next debug checklist**: Check  (). The native fonts in  do not support Devanagari glyphs. A custom Devanagari TrueType font () needs to be embedded into the PDF document during the /declare -x AGENT_BROWSER_EXECUTABLE_PATH="/usr/bin/chromium"
+declare -x CHROME_PATH="/usr/bin/chromium"
+declare -x DEBIAN_FRONTEND="noninteractive"
+declare -x EMERGENT_PYPI_INDEX="https://d33sy5i8bnduwe.cloudfront.net/simple/"
+declare -x ENABLE_RELOAD="true"
+declare -x GPG_KEY="A035C8C19219BA821ECEA86B64E628F8D684696D"
+declare -x HOME="/root"
+declare -x HOSTNAME="agent-env-7e7f1638-5cda-4853-959b-80cd22338f49"
+declare -x INTEGRATION_PROXY_URL="https://integrations.emergentagent.com"
+declare -x KUBERNETES_PORT="tcp://34.118.224.1:443"
+declare -x KUBERNETES_PORT_443_TCP="tcp://34.118.224.1:443"
+declare -x KUBERNETES_PORT_443_TCP_ADDR="34.118.224.1"
+declare -x KUBERNETES_PORT_443_TCP_PORT="443"
+declare -x KUBERNETES_PORT_443_TCP_PROTO="tcp"
+declare -x KUBERNETES_SERVICE_HOST="34.118.224.1"
+declare -x KUBERNETES_SERVICE_PORT="443"
+declare -x KUBERNETES_SERVICE_PORT_HTTPS="443"
+declare -x LANG="C.UTF-8"
+declare -x LINTERS_PYPI_INDEX="https://d33sy5i8bnduwe.cloudfront.net/simple/"
+declare -x NEXT_TELEMETRY_DISABLED="1"
+declare -x NODE_VERSION="20"
+declare -x OLDPWD
+declare -x PATH="/root/.venv/bin:/opt/plugins-venv/bin:/root/bin:/opt/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+declare -x PIP_NO_INPUT="1"
+declare -x PLAYWRIGHT_BROWSERS_PATH="/pw-browsers"
+declare -x PLAYWRIGHT_CHROME_EXECUTABLE_PATH="/usr/local/bin/browser-use-chromium"
+declare -x PLUGIN_VENV_PATH="/opt/plugins-venv"
+declare -x PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium"
+declare -x PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
+declare -x PWD="/app"
+declare -x PYTHONUNBUFFERED="1"
+declare -x PYTHON_SHA256="91bcdebfdde239a003ae93738a7fce0f9230fee5c4bc2b86f6e6e8c6f98aabe8"
+declare -x PYTHON_VERSION="3.11.16"
+declare -x SHLVL="1"
+declare -x STRIPE_API_KEY="sk_test_emergent"
+declare -x UV_COMPILE_BYTECODE="1"
+declare -x UV_EXTRA_INDEX_URL="https://d33sy5i8bnduwe.cloudfront.net/simple/"
+declare -x VIRTUAL_ENV="/root/.venv"
+declare -x WEBHOOK_CRON_API_URL="https://ea.int.apis.emergentagent.com"
+declare -x base_url="https://demobackend.emergentagent.com"
+declare -x code_server_password="a36ee71e"
+declare -x integration_proxy_url="https://integrations.emergentagent.com"
+declare -x job_id="d3c95870-25e1-4049-a4bf-be1ea38b2d8b"
+declare -x monitor_polling_interval="1"
+declare -x preview_endpoint="https://lovepdf-tools-1.preview.emergentagent.com"
+declare -x run_id="7e7f1638-5cda-4853-959b-80cd22338f49" phase so that the edited Hindi text renders correctly in the downloaded file.
+- **Why fix this issue and what will be achieved with the fix?**: Currently, if a user edits Hindi text, it shows correctly on the screen but will disappear or show as squares/gibberish when the PDF is downloaded.
+- **Status**: NOT STARTED
+- **Is recurring issue?**: N
+- **Should Test frontend/backend/both after fix?**: Frontend & manual download verification.
+
+Issue 2: Frontend UI Test Validation (Priority: P1)
+- **Attempted fixes**: Manual visual tests done, but deep frontend automated testing pending.
+- **Next debug checklist**: Test  state clearing,  image upload, and  rendering.
+- **Status**: USER VERIFICATION PENDING
+- **Is recurring issue?**: N
+- **Should Test frontend/backend/both after fix?**: Frontend.
+
+**In progress Task List**: 
+*(No code tasks are currently left incomplete; the agent paused to ask for user direction on the PDF font embedding limitation).*
+
+**Upcoming and Future Tasks**:
+- **Task 1 (P0)**: Embed Devanagari  font into  inside  () so that Hindi text exports correctly on .
+- **Task 2 (P1)**: Run  for newly added Admin Dashboard tabs, Edit PDF page, and Sign Page UI tools.
+- **Task 3 (P2)**: Deployment preparation. Instruct the user on adding , , and  to production environment variables before they hit deploy.
+
+**Completed work in this session**:
+- Recreated missing frontend/backend  files.
+- Admin Panel Integration: Migrated  and frontend admin components from GitHub ().
+- System Dependencies: Installed and persisted , , , , , , , and  in .
+- PDF to Word/Excel Strict Validation: Added , , and  using LibreOffice headless in .
+- ToolPage UI Bug fixes: Merged state clear bug fix and improved Thumbnail previews in .
+- Legacy Hindi (Kruti Dev) Resolution: Created deterministic JS () and Python () ASCII to Unicode converters to fix gibberish in PDF-to-Word/Excel and EditPdf endpoints. Added .
+- SignPage Background Removal Fix: Installed missing , ,  for local  processing. 
+
+**Earlier issues found/mentioned but not fixed**:
+*None. All user-reported issues were addressed, tracked, and tested.*
+
+**Known issue recurrence from previous fork**:
+- Issue recurrence in previous fork:  files disappeared (likely due to environment resets).
+- Recurrence count: 1
+- Status: RESOLVED (Agent recreated them).
+
+**Code Architecture**:
+
+
+**Key Technical Concepts**:
+- **Frontend**: React, Tailwind,  (for editing PDFs natively in browser),  (for rendering).
+- **Backend**: FastAPI, MongoDB (for Admin/SEO config). 
+- **Processing**:  headless (office normalizations),  (OCR),  (offline background removal using ), Deterministic Kruti Dev to Unicode character mapping.
+
+**key DB schema**:
+- Admin panel uses MongoDB for:
+  - : {slug, title, content, seo_title, etc.}
+  - : {domain, site_name, analytics_code, etc.}
+  - : {route, title, description, keywords}
+
+**changes in tech stack**:
+Heavy reliance on OS-level Linux binaries. Added packages: , , . Python dependencies updated with , , .
+
+**All files of reference**:
+1.  - Core logic for validation, legacy Hindi conversion, and OCR fallback.
+2.  - UI for tool preview and processing.
+3.  - Implements  converter for displaying Hindi.
+4.  - Signature logic involving  API.
+5.  - CRITICAL for ensuring apt 2.6.1 (arm64)
+Usage: apt-get [options] command
+       apt-get [options] install|remove pkg1 [pkg2 ...]
+       apt-get [options] source pkg1 [pkg2 ...]
+
+apt-get is a command line interface for retrieval of packages
+and information about them from authenticated sources and
+for installation, upgrade and removal of packages together
+with their dependencies.
+
+Most used commands:
+  update - Retrieve new lists of packages
+  upgrade - Perform an upgrade
+  install - Install new packages (pkg is libc6 not libc6.deb)
+  reinstall - Reinstall packages (pkg is libc6 not libc6.deb)
+  remove - Remove packages
+  purge - Remove packages and config files
+  autoremove - Remove automatically all unused packages
+  dist-upgrade - Distribution upgrade, see apt-get(8)
+  dselect-upgrade - Follow dselect selections
+  build-dep - Configure build-dependencies for source packages
+  satisfy - Satisfy dependency strings
+  clean - Erase downloaded archive files
+  autoclean - Erase old downloaded archive files
+  check - Verify that there are no broken dependencies
+  source - Download source archives
+  download - Download the binary package into the current directory
+  changelog - Download and display the changelog for the given package
+
+See apt-get(8) for more information about the available commands.
+Configuration options and syntax is detailed in apt.conf(5).
+Information about how to configure sources can be found in sources.list(5).
+Package and version choices can be expressed via apt_preferences(5).
+Security details are available in apt-secure(8).
+                                        This APT has Super Cow Powers. deps survive deployments.
+6.  - Holds Admin Login details.
+
+**Areas that need refactoring**:
+-  will need updates to embed  fonts for non-Latin character saving.
+
+**key api endpoints**:
+-  & 
+-  (Detects if a PDF contains legacy Kruti Dev fonts)
+- 
+- 
+
+**Critical Info for New Agent**:
+- **DO NOT TOUCH/REPLACE** , , or  logic with versions from the user's Github repo. The user explicitly wants to preserve the current advanced logic here.
+- Local  is intentional to save on API costs. Do not switch it to  API keys.
+- Kruti Dev mapping is deterministic. The Python and JS libraries are byte-identical.
+- Testing credentials for the Admin panel: Check  (Usually  / ).
+
+**documents and test reports created in this job**:
+- 
+- 
+- 
+
+**Last 10 User Messages and any pending HUMAN messages**:
+1. *User*: Asked to publish app and verify new admin panel code from GitHub. -> *Done*
+2. *User*: Provided repo URL . -> *Repo lacked admin panel.*
+3. *User*: Provided correct repo URL . -> *Admin integrated.*
+4. *User*: Alerted to keep Edit PDF / Sign PDF safe. Add system tools to , enforce strict docx/xlsx validation with libreoffice, set Tesseract OCR. -> *Done*
+5. *User*: Merge specific UI bug fixes (State clear bug, preview UI) from repo. -> *Done*
+6. *User*: Reported Hindi PDF to Word conversion yielding empty files. Fix via Tesseract Hindi pack. -> *Done*
+7. *User*: Reported Edit PDF & Word output showing gibberish for Hindi. Provided screenshots. -> *Identified as Kruti Dev legacy font. Built Unicode converter.*
+8. *User*: Requested adding Kruti Dev fix to  as well. Pointed out dotted lines messing up OCR. -> *Done. Added  and applied Kruti converter.*
+9. *User*: Edit PDF also showing gibberish. Fix it. -> *Done. Wired converter to EditPdfPage.*
+10. *User (Agentic Edit)*:  line 413 function not working. -> *Identified as  500 error. Fixed missing deps. Done.*
+
+**Project Health Check**:
+- **Backend API**: Healthy (Tested 19/19).
+- **Admin Panel**: Healthy.
+- **Frontend Tools**: Healthy.
+- **Broken**: Saving Edited Hindi text in  (Displays fine, but native  lacks Devanagari font embedding to export correctly).
+
+**3rd Party Integrations**:
+-  (Background removal) - Uses local Python ML model. NO API key required.
+
+**Testing status**:
+- Testing agent used after significant changes: YES ( ran multiple times successfully).
+- Troubleshoot agent used after agent stuck in loop: NO
+- Test files created: 
+- Known regressions: None detected.
+
+**Credentials to test flow**:
+Check 
+
+**What agent forgot to execute**:
+The agent didn't forget, but actively paused to ask the user if they wanted the agent to implement Devanagari font embedding in  for exporting Hindi documents. The next agent should pick this up immediately if the user agrees.
+
+**Debugging checklist for current issue**
+    Issue: Edited Hindi text disappears or turns to gibberish when the user downloads the edited PDF from .
+    
+    Frontend files to check:  (specifically  method).
+    
+    Why fix this issue:  relies on Standard14Fonts which do not support Unicode/Devanagari characters.
+    
+    Proposed Fix: 
+    1. Host a Devanagari TTF file (e.g., Lohit-Devanagari) in the  folder.
+    2. In , fetch this TTF file as an ArrayBuffer.
+    3. Use  and apply this custom font when drawing text () if the text contains Devanagari characters (or universally for all text additions to be safe).</analysis>

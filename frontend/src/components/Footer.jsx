@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Twitter, Github, Linkedin, Heart } from 'lucide-react';
+import { Twitter, Github, Linkedin, Heart, Mail } from 'lucide-react';
 import { Logo } from './Header';
 import { TOOLS } from '../mock';
 
@@ -37,7 +37,13 @@ const Footer = () => {
                   <Icon className="w-4 h-4" />
                 </a>
               ))}
+              <a href="mailto:lovepdf.support@gmail.com" aria-label="Email support" className="grid place-items-center w-9 h-9 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-500/40 transition-colors">
+                <Mail className="w-4 h-4" />
+              </a>
             </div>
+            <a href="mailto:lovepdf.support@gmail.com" className="mt-5 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors">
+              <Mail className="w-4 h-4" /> lovepdf.support@gmail.com
+            </a>
           </div>
           <LinkCol title="Organize" tools={col1} />
           <LinkCol title="Convert" tools={col2} />

@@ -2,7 +2,7 @@ import asyncio, os, zipfile, sys
 from playwright.async_api import async_playwright
 from docx import Document
 
-BASE = os.environ.get('REACT_APP_BACKEND_URL', 'https://pdf-support-stack.preview.emergentagent.com')
+BASE = os.environ.get('REACT_APP_BACKEND_URL', 'https://lovepdf-tools-1.preview.emergentagent.com')
 
 async def run_one(p, pdf_path, expected_name, expected_text):
     browser = await p.chromium.launch(headless=True)

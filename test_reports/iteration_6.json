@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 6: verified the merged bug-fix changes. Backend: created /app/backend/tests/test_inspect_and_conversions.py (pytest) covering /api/pdf/health, /api/pdf/inspect (new fields legacy_hindi/has_text/devanagari_ratio/looks_english/fonts, English PDF, simulated Kruti Dev PDF, malformed-file no-500) and pdf-to-word / pdf-to-excel regression -> 6/6 PASS. Frontend E2E via Playwright on the public URL: PDF-to-JPG ZIP flow (3-page PDF -> download-all-zip-button label 'Download All Images (ZIP)', valid PK zip with page_1/2/3.jpg, per-page download-image-button-0/1/2 + page-badge-0/1/2, single-image download works, zero console errors / no jszip errors); Edit PDF Hindi export (Devanagari PDF uploaded, 2 text runs rendered and editable, Save changes -> non-empty valid %PDF download, embedded Lohit-Devanagari font, 80 Devanagari chars, zero '?' placeholders, NO regeneratorRuntime/fontkit console errors, rendered page visually correct); Home shows all 6 popular tiles incl. 'PDF to JPG'; footer mailto lovepdf.support@gmail.com present and visible.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/pdf/inspect", "issue": "legacy_hindi is decided purely by embedded font-name matching (LEGACY_HINDI_FONTS). A legacy Kruti/DevLys PDF whose font was subset/renamed by the producing tool (very common) reports legacy_hindi=false even though has_text=true, devanagari_ratio=0.0 and looks_english=false — the exact signature of ASCII-mapped Hindi. Consider also flagging legacy when has_text && devanagari_ratio<0.02 && !looks_english."},
+      {"endpoint": "/api/pdf/inspect", "issue": "Bare `except Exception` returns HTTP 200 with all-false payload for any failure (incl. non-PDF uploads). Good for no-500, but a corrupt/invalid file is indistinguishable from a valid image-only PDF; consider 400 for unparsable input."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Edit PDF export (client-side pdf-lib)", "issue": "MINOR: exported PDF keeps the ORIGINAL text in the invisible text layer under the new white box, so copy/paste & text-search of the exported PDF returns duplicated/garbled text (e.g. 'ननममस्सत्ते दे दुिनुनयिया...'). Visual render is correct. Consider redacting the original text run instead of only painting over it.", "affected_selectors": ["[data-testid=\"edit-save-button\"]"]},
+      {"flow": "PDF to JPG ZIP", "issue": "COSMETIC: 'Preparing ZIP…' spinner state could not be observed for a 3-page doc (zip completes in <200ms). Not a defect; the zipping state exists in code.", "affected_selectors": ["[data-testid=\"download-all-zip-button\"]"]}
+    ],
+    "design_issues": [
+      {"screen": "Edit PDF editor", "issues": ["Editor toolbar / text runs / page thumbnails had no data-testid attributes; I added edit-save-button, pdf-text-run, pdf-text-input (see updated_files). Page thumbnails and tab buttons still lack data-testid."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_inspect_and_conversions.py",
+    "/app/test_reports/pytest/iter6_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: strengthen legacy_hindi detection in /api/pdf/inspect with the content heuristic (has_text && devanagari_ratio~0 && !looks_english) since font names are often subset/renamed.",
+    "OPTIONAL: when saving edited text, remove/redact the original text run from the content stream so exported PDFs don't contain duplicated hidden text.",
+    "OPTIONAL: add data-testid to EditPdfPage tab buttons and page thumbnails for future automation."
+  ],
+  "critical_code_review_comments": [
+    "backend/pdf_tools.py: /inspect swallows every exception into a 200 all-false response — no logging, so real parsing failures are invisible in production logs. Add logger.exception().",
+    "frontend/src/pages/EditPdfPage.jsx is 606 lines and ToolPage.jsx is 819 lines (>700). ToolPage should be split (ResultView + per-tool option panels) per file-size guideline.",
+    "ToolPage ResultView.downloadAllImages() silently swallows zip failures and falls back to N individual downloads with no user-visible message — consider surfacing an error toast."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_inspect_and_conversions.py",
+    "/app/frontend/src/pages/EditPdfPage.jsx (added data-testid: edit-save-button, pdf-text-run, pdf-text-input)"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (4/4 flows)"},
+  "seed_data_creation": "fpdf2 fixtures only: /tmp/three_pages.pdf (3-page English), /tmp/hindi.pdf (Unicode Devanagari), in-test English/table PDFs, and /tmp/KrutiDev010.ttf (Lohit TTF renamed via fontTools to simulate a legacy Kruti Dev font name). No DB data created.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "not required (no auth in tested flows)",
+  "context_for_next_testing_agent": "All targeted merged fixes verified working. Backend regression suite for these flows: /app/backend/tests/test_inspect_and_conversions.py (run: python -m pytest backend/tests/test_inspect_and_conversions.py). NOTE: a Kruti Dev fixture cannot be made with fpdf2 + Lohit directly — fpdf2 embeds the TTF's internal name, so the test renames the name table with fontTools first. Admin/blog CRUD and SignPage remove-bg were NOT retested (unchanged, 19/19 in iteration 5). Known non-blocking findings: font-name-only legacy detection, duplicated hidden text layer in Edit-PDF exports.",
+  "rca_of_the_issue": "Initial kruti fixture failure was a test-fixture limitation, not an app bug: fpdf2 writes the font's internal name (LohitDevanagari) as the PDF BaseFont, so _is_legacy_hindi() (font-name substring match) found no legacy token. Fixed by renaming the TTF name table to 'KrutiDev010' with fontTools; /inspect then correctly returned legacy_hindi=true."
+}

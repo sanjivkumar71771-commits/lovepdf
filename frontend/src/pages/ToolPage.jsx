@@ -254,7 +254,7 @@ const ToolPage = () => {
         }
         case 'pdf-to-jpg': {
           const images = await pdf.pdfToImages(files[0], { scale: Number(opts.quality) || 2 });
-          setResult({ images });
+          setResult({ images, zipName: `${base}_images.zip` });
           break;
         }
         default:
@@ -704,7 +704,18 @@ const ResultView = ({ result, onReset }) => {
   }, []);
   const meta = result.meta;
   const fmt = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(2)} MB` : `${(b / 1024).toFixed(0)} KB`);
-  const downloadAllImages = () => result.images.forEach((im) => pdf.download(im.blob, im.name, 'image/jpeg'));
+  const [zipping, setZipping] = useState(false);
+  const downloadAllImages = async () => {
+    if (zipping) return;
+    setZipping(true);
+    try {
+      await pdf.downloadImagesAsZip(result.images, result.zipName || 'images.zip');
+    } catch (e) {
+      // Fallback: if zipping fails, download individually as a last resort.
+      result.images.forEach((im) => pdf.download(im.blob, im.name, 'image/jpeg'));
+    }
+    setZipping(false);
+  };
 
   if (isCompare) {
     const { similarity, rows } = result.compare;
@@ -770,15 +781,31 @@ const ResultView = ({ result, onReset }) => {
 
       {isImages && (
         <>
-          <button onClick={downloadAllImages} className="mt-6 inline-flex items-center gap-2 btn-primary text-white font-semibold px-7 py-3.5 rounded-xl transition">
-            <Download className="w-5 h-5" /> Download all {result.images.length} images
+          <button data-testid="download-all-zip-button" onClick={downloadAllImages} disabled={zipping} className="mt-6 inline-flex items-center gap-2 btn-primary text-white font-semibold px-7 py-3.5 rounded-xl transition disabled:opacity-60">
+            {zipping ? <><Loader2 className="w-5 h-5 animate-spin" /> Preparing ZIP…</> : <><Download className="w-5 h-5" /> Download All Images (ZIP)</>}
           </button>
-          <div className="mt-6 grid grid-cols-3 sm:grid-cols-5 gap-3">
-            {result.images.map((im) => (
-              <button key={im.name} onClick={() => pdf.download(im.blob, im.name, 'image/jpeg')} className="rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 hover:border-rose-300 transition-colors">
-                <img src={im.url} alt={im.name} className="w-full" />
-              </button>
-            ))}
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Downloads all {result.images.length} images together in one .zip file.</p>
+
+          <div className="mt-8 border-t border-slate-200 dark:border-white/10 pt-6">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Download This Image</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Click any image below to save just that single page.</p>
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {result.images.map((im, i) => (
+                <div key={im.name} className="rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] flex flex-col">
+                  <div className="relative bg-slate-50 dark:bg-white/[0.02]">
+                    <img src={im.url} alt={im.name} className="w-full" />
+                    <span data-testid={`page-badge-${i}`} className="absolute top-1.5 left-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/55 text-white">Page {i + 1}</span>
+                  </div>
+                  <button
+                    data-testid={`download-image-button-${i}`}
+                    onClick={() => pdf.download(im.blob, im.name, 'image/jpeg')}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border-t border-slate-200 dark:border-white/10 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download This Image
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}

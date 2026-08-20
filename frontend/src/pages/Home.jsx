@@ -26,7 +26,11 @@ const Home = () => {
     return inCat && inQuery;
   });
 
-  const popular = TOOLS.filter((t) => t.ready).slice(0, 6);
+  // Curated "Most popular tools" — explicitly includes PDF to JPG (and JPG to PDF).
+  const POPULAR_SLUGS = ['merge-pdf', 'split-pdf', 'compress-pdf', 'organize-pdf', 'pdf-to-jpg', 'jpg-to-pdf'];
+  const popular = POPULAR_SLUGS
+    .map((s) => TOOLS.find((t) => t.slug === s && t.ready))
+    .filter(Boolean);
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0d16] text-slate-900 dark:text-slate-100 transition-colors">

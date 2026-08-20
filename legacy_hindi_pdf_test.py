@@ -17,7 +17,7 @@ from fpdf import FPDF
 from docx import Document
 
 # Backend URL from environment
-BACKEND_URL = os.getenv('REACT_APP_BACKEND_URL', 'https://pdf-support-stack.preview.emergentagent.com')
+BACKEND_URL = os.getenv('REACT_APP_BACKEND_URL', 'https://lovepdf-tools-1.preview.emergentagent.com')
 API_BASE = f"{BACKEND_URL}/api"
 
 # Font path
