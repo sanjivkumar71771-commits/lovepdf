@@ -147,7 +147,9 @@ const EditPdfPage = () => {
 
   const touchedList = Object.entries(edits).filter(([, e]) => e.touched);
   const editedCount = touchedList.length;
-  const changeCount = editedCount + objects.length;
+  // Don't count empty (not-yet-typed) text boxes toward the change counter.
+  const activeObjCount = objects.filter((o) => o.kind !== 'text' || (o.text || '').trim()).length;
+  const changeCount = editedCount + activeObjCount;
 
   // ---- Shapes & inserted images (movable objects) ----
   const addShape = (type) => {
@@ -159,6 +161,23 @@ const EditPdfPage = () => {
       : { n: { x: 0.25, y: 0.3, w: 0.35, h: 0.14 }, color: '#e11d48', strokeWidth: 2, fill: false, opacity: 0.25 };
     setObjects((prev) => [...prev, { id, kind: 'shape', type, pageIndex, ...defaults }]);
     setSelectedObjId(id); setActiveTab('shapes');
+  };
+
+  // ---- Add new text box (type Hindi/English on blank space) ----
+  const addTextBox = () => {
+    if (!preview) return;
+    const id = 'o' + Math.random().toString(36).slice(2);
+    // Cascade each new box so consecutive boxes don't stack exactly on top.
+    const off = (objects.filter((o) => o.kind === 'text').length % 6) * 0.035;
+    setObjects((prev) => [...prev, {
+      id, kind: 'text', pageIndex,
+      n: { x: 0.22 + off, y: 0.28 + off, w: 0.42, h: 0.06 },
+      ptW: preview.ptW, ptH: preview.ptH,
+      text: '', size: 16, family: 'sans',
+      bold: false, italic: false, underline: false,
+      color: '#0f172a', align: 'left',
+    }]);
+    setSelectedObjId(id); setSelectedId(null); setActiveTab('annotate');
   };
 
   const addImageObj = (fileList) => {
@@ -234,7 +253,22 @@ const EditPdfPage = () => {
       }));
       const shapes = objects.filter((o) => o.kind === 'shape').map((o) => ({ pageIndex: o.pageIndex, type: o.type, n: o.n, color: o.color, opacity: o.opacity, strokeWidth: o.strokeWidth, fill: o.fill }));
       const images = objects.filter((o) => o.kind === 'image').map((o) => ({ pageIndex: o.pageIndex, dataUrl: o.dataUrl, n: o.n }));
-      const bytes = await pdf.applyPdfEdits(file, { texts, shapes, images });
+      // Brand-new text boxes -> text edits placed by normalized coords (no cover box).
+      const newTexts = objects.filter((o) => o.kind === 'text' && (o.text || '').trim()).map((o) => {
+        const size = o.size || 16;
+        const topPt = o.ptH - o.n.y * o.ptH; // box top, PDF points from bottom
+        return {
+          pageIndex: o.pageIndex,
+          xPt: o.n.x * o.ptW,
+          yPt: topPt - size,
+          widthPt: o.n.w * o.ptW,
+          noBg: true,
+          text: o.text,
+          family: o.family, bold: o.bold, italic: o.italic, underline: o.underline,
+          size, color: o.color, align: o.align,
+        };
+      });
+      const bytes = await pdf.applyPdfEdits(file, { texts: [...texts, ...newTexts], shapes, images });
       const name = (docName || 'document').replace(/\.pdf$/i, '') + '-edited.pdf';
       pdf.download(bytes, name);
       setResult({ name });
@@ -305,6 +339,74 @@ const EditPdfPage = () => {
           </div>
         </div>
         <button type="button" onClick={() => resetOne(id)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-rose-500"><RotateCcw className="w-4 h-4" /> Reset this text</button>
+      </div>
+    );
+  };
+
+  const renderAnnotatePanel = () => {
+    const o = selectedObj && selectedObj.kind === 'text' ? selectedObj : null;
+    return (
+      <div className="space-y-4">
+        <button onClick={addTextBox} disabled={!preview} data-testid="add-text-box-button"
+          className="w-full flex flex-col items-center justify-center gap-2 py-7 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/10 hover:border-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-500/[0.05] transition-colors text-slate-500 disabled:opacity-50">
+          <Type className="w-7 h-7 text-rose-500" />
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Add a text box</span>
+          <span className="text-xs text-center px-3">Type Hindi or English anywhere — perfect for filling forms &amp; adding notes.</span>
+        </button>
+        {o ? (
+          <div className="space-y-4 pt-1 border-t border-slate-100 dark:border-white/5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500">Text box selected</span>
+              <button onClick={() => removeObj(o.id)} className="inline-flex items-center gap-1 text-xs font-semibold text-rose-500 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Text</label>
+              <input value={o.text} data-testid="add-text-input" autoFocus
+                onChange={(e) => updateObj(o.id, { text: e.target.value })}
+                placeholder="Type your text…"
+                className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm outline-none focus:border-rose-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Font</label>
+              <select value={o.family} onChange={(e) => updateObj(o.id, { family: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm outline-none focus:border-rose-400">
+                {FAMILIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </div>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Size</label>
+                <div className="flex items-center rounded-lg border border-slate-200 dark:border-white/10 overflow-hidden">
+                  <button type="button" onClick={() => updateObj(o.id, { size: Math.max(6, (o.size || 16) - 1) })} className="px-2.5 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"><Minus className="w-4 h-4" /></button>
+                  <input type="number" min={6} max={200} value={o.size || 16} onChange={(e) => updateObj(o.id, { size: Math.max(6, Math.min(200, parseInt(e.target.value || '0', 10) || 6)) })} className="w-full text-center text-sm bg-transparent outline-none py-2" />
+                  <button type="button" onClick={() => updateObj(o.id, { size: Math.min(200, (o.size || 16) + 1) })} className="px-2.5 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"><Plus className="w-4 h-4" /></button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Colour</label>
+                <input type="color" value={o.color} onChange={(e) => updateObj(o.id, { color: e.target.value })} className="w-11 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white cursor-pointer" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Style</label>
+              <div className="flex gap-2">
+                <StyleToggle active={o.bold} onClick={() => updateObj(o.id, { bold: !o.bold })} title="Bold"><Bold className="w-4 h-4" /></StyleToggle>
+                <StyleToggle active={o.italic} onClick={() => updateObj(o.id, { italic: !o.italic })} title="Italic"><Italic className="w-4 h-4" /></StyleToggle>
+                <StyleToggle active={o.underline} onClick={() => updateObj(o.id, { underline: !o.underline })} title="Underline"><Underline className="w-4 h-4" /></StyleToggle>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Alignment</label>
+              <div className="flex gap-2">
+                <StyleToggle active={o.align === 'left'} onClick={() => updateObj(o.id, { align: 'left' })} title="Align left"><AlignLeft className="w-4 h-4" /></StyleToggle>
+                <StyleToggle active={o.align === 'center'} onClick={() => updateObj(o.id, { align: 'center' })} title="Align center"><AlignCenter className="w-4 h-4" /></StyleToggle>
+                <StyleToggle active={o.align === 'right'} onClick={() => updateObj(o.id, { align: 'right' })} title="Align right"><AlignRight className="w-4 h-4" /></StyleToggle>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Add a text box, then drag it into position and type your text in this panel. Hindi (Devanagari) is fully supported on export.</p>
+        )}
       </div>
     );
   };
@@ -543,6 +645,16 @@ const EditPdfPage = () => {
                         let inner;
                         if (o.kind === 'image') {
                           inner = <img src={o.dataUrl} alt="inserted" className="w-full h-full object-fill pointer-events-none select-none" />;
+                        } else if (o.kind === 'text') {
+                          inner = (
+                            <div className="w-full h-full overflow-hidden select-none pointer-events-none" style={{
+                              fontFamily: famCss(o.family), fontSize: (o.size || 16) * scale,
+                              fontWeight: o.bold ? 700 : 400, fontStyle: o.italic ? 'italic' : 'normal',
+                              textDecoration: o.underline ? 'underline' : 'none', textAlign: o.align || 'left',
+                              color: (o.text || '').trim() ? o.color : '#94a3b8', lineHeight: 1.15,
+                              whiteSpace: 'pre', padding: '0 1px',
+                            }}>{(o.text || '').trim() ? o.text : 'Type your text…'}</div>
+                          );
                         } else if (o.type === 'highlight') {
                           inner = <div className="w-full h-full" style={{ background: o.color, opacity: o.opacity ?? 0.35 }} />;
                         } else if (o.type === 'line') {
@@ -552,7 +664,7 @@ const EditPdfPage = () => {
                         }
                         return (
                           <div key={o.id} className={`absolute ${sel ? 'outline outline-2 outline-rose-500/80' : ''}`}
-                            style={{ left, top, width: w, height: h, zIndex: sel ? 25 : 15, cursor: 'move' }}
+                            style={{ left, top, width: w, height: h, zIndex: sel ? 25 : 15, cursor: 'move', ...(o.kind === 'text' && !sel ? { outline: '1px dashed rgba(148,163,184,0.7)' } : {}) }}
                             onMouseDown={(e) => startObjDrag(e, o.id, 'move')} onTouchStart={(e) => startObjDrag(e, o.id, 'move')}>
                             {inner}
                             {sel && (
@@ -590,7 +702,7 @@ const EditPdfPage = () => {
                 {activeTab === 'edit-text' ? renderEditTextPanel()
                   : activeTab === 'shapes' ? renderShapesPanel()
                   : activeTab === 'insert' ? renderInsertPanel()
-                  : activeTab === 'annotate' ? comingSoon('Annotate')
+                  : activeTab === 'annotate' ? renderAnnotatePanel()
                   : comingSoon('Forms')}
               </div>
             </aside>

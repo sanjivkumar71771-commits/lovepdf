@@ -233,6 +233,23 @@ backend:
         -comment: "✅ LEGACY KRUTI DEV CONVERSION VERIFIED - ALL TESTS PASSED (11/11). Created comprehensive test suite in /app/backend_test.py. Test 1 (Kruti Dev PDF to Word): Created PDF with font name 'KrutiDev010' containing genuine Kruti Dev ASCII encoding ('pfj= izek.k i=', 'izekf.kr fd;k tkrk gS...'), POST to /api/pdf/pdf-to-word returned HTTP 200, valid .docx (20833 bytes), extracted 154 chars with 126 Devanagari Unicode chars (U+0900-U+097F), text contains 'चरित्र प्रमाण पत्र', 'प्रमाणित किया जाता है', NO ASCII gibberish found. Test 2 (Kruti Dev PDF to Excel): Same PDF to /api/pdf/pdf-to-excel returned HTTP 200, valid .xlsx (5461 bytes), cells contain 126 Devanagari chars with proper Unicode text. Test 3 (PDF inspect): POST to /api/pdf/inspect returned HTTP 200, legacy_hindi=true, fonts=['KrutiDev010']. Test 4 (English regression): Plain English PDF to /api/pdf/inspect returned legacy_hindi=false, pdf-to-word returned valid .docx with English text (112 chars). Test 5 (Health check): GET /api/pdf/health returned all tools available (soffice, gs, qpdf, tesseract, pdftoppm, ocrmypdf). CORE FUNCTIONALITY VERIFIED: Legacy Kruti Dev ASCII text layer is deterministically converted to real Devanagari Unicode (not gibberish, not empty), krutidev.py converter working correctly, inspect endpoint properly detects legacy fonts."
 
 frontend:
+  - task: "Edit PDF - Add New Text Box (type Hindi/English on blank space, form filling)"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/EditPdfPage.jsx, frontend/src/lib/pdfUtils.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New feature. Annotate tab now functional: 'Add a text box' button (data-testid=add-text-box-button) inserts a draggable/resizable text object (kind:'text') on the current page. Right panel shows Text input (data-testid=add-text-input), Font, Size +/-, Colour, Bold/Italic/Underline, Alignment. On Save, new text boxes convert to text edits placed by normalized coords with noBg:true (no cover rectangle) and are baked via applyPdfEdits -> drawText. Devanagari/Hindi export uses the embedded Lohit font (needsUnicodeFont). pdfUtils applyPdfEdits now skips the cover rectangle when e.noBg. Needs E2E: upload PDF, Annotate tab, Add text box, type Hindi + English, drag/position, Save -> exported PDF is valid non-empty and shows the added text (Hindi as Devanagari, not '?')."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ VERIFIED (iteration_7) 100% acceptance criteria pass. Uploaded fpdf2 form PDF -> Annotate -> add-text-box-button -> box appears dashed + auto-selected -> typed English 'Signed by John' + Hindi 'श्री राम कुमार' via add-text-input -> bold -> drag -> Save. Exported test_form-edited.pdf (5483 bytes, %PDF-1.7), ZERO console errors (no fontkit/regeneratorRuntime). pypdf extraction: both English and Hindi present as real Devanagari (0 '?'), fonts /Helvetica + /Lohit-Devanagari-2000 (Type0) embedded. Delete (panel + on-canvas trash) works, counter decrements. Regression: Edit Text/Shapes/Insert/Forms tabs all still work. Minor polish (empty-box counted in Save counter; new boxes stacked at same position) FIXED by main agent afterward."
+        -working: true
+        -agent: "main"
+        -comment: "Applied the 2 LOW polish fixes from iteration_7: (1) changeCount now ignores empty text boxes (activeObjCount filters kind==='text' with empty text); (2) addTextBox cascades position by 0.035*count so consecutive boxes don't overlap. Compiles clean."
   - task: "Admin login + dashboard (Pages SEO / Site / Blog / Account tabs)"
     implemented: true
     working: "NA"
@@ -275,9 +292,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Edit PDF Hindi/Devanagari export (embed Lohit-Devanagari TTF via fontkit in pdf-lib)"
-    - "PDF to JPG -> Download All as single ZIP (jszip) + per-image download"
-    - "PDF inspect endpoint new fields (has_text, looks_english) + regression"
+    - "Edit PDF - Add New Text Box (type Hindi/English on blank space, form filling)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"

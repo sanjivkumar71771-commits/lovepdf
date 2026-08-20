@@ -606,7 +606,9 @@ export const applyPdfEdits = async (file, { texts = [], shapes = [], images = []
     else if (e.align === 'right') drawX = e.xPt + (boxW - tw);
     const left = Math.min(e.xPt, drawX) - 1;
     const right = Math.max(e.xPt + boxW, drawX + tw) + 1;
-    page.drawRectangle({ x: left, y: e.yPt - size * 0.30, width: right - left, height: size * 1.34, color: hexToRgb(e.bg) });
+    // Skip the cover rectangle for brand-new text boxes (noBg) so they don't
+    // paint an opaque box over existing page content.
+    if (!e.noBg) page.drawRectangle({ x: left, y: e.yPt - size * 0.30, width: right - left, height: size * 1.34, color: hexToRgb(e.bg) });
     const col = hexToRgb(e.color);
     try { page.drawText(text, { x: drawX, y: e.yPt, size, font, color: col }); }
     catch {

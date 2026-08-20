@@ -80,3 +80,7 @@ Merged bug fixes from https://github.com/nyolraj3188-creator/rajnyol (verified v
 - **Footer**: clickable `mailto:lovepdf.support@gmail.com` on every page.
 - SignPage / image_tools.py unchanged (no repo diff). Admin/blog CRUD not retested (unchanged since iteration 5, 19/19).
 - Non-blocking notes (optional backlog): backend pdf-to-word/excel legacy conversion still keys off font name (`_is_legacy_hindi`); Edit-PDF export leaves original text in the hidden text layer under the cover box (true redaction is future work).
+
+### Add New Text Box (Edit PDF) — June 2026
+- **NEW FEATURE (verified iteration_7)**: `/tool/edit-pdf` Annotate tab is now functional. "Add a text box" (`add-text-box-button`) drops a draggable/resizable text object on any blank spot; right panel edits text (`add-text-input`), font, size, colour, bold/italic/underline, alignment. Great for filling forms & adding notes/signatures. On Save, new boxes convert to text edits (normalized coords, `noBg:true` so no cover rectangle) baked via `applyPdfEdits` — Hindi/Devanagari exports correctly using the embedded Lohit font (verified: real Devanagari, 0 '?', Lohit Type0 embedded). `applyPdfEdits` now skips the cover rectangle when `e.noBg`. Polish: empty boxes not counted toward Save counter; consecutive boxes cascade position.
+- KNOWN (non-blocking): Annotate/styling panel is desktop-only (`hidden lg:block`, viewport ≥1024px); multi-line typed text is single-line on export.

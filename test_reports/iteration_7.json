@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only E2E testing of the new 'Add New Text Box' feature on /tool/edit-pdf (backend not retested per request). Generated an A4 form PDF with fpdf2, uploaded it, and validated: Annotate tab -> add-text-box-button -> box appears dashed + auto-selected -> typed English ('Signed by John') and Hindi Devanagari ('श्री राम कुमार') via add-text-input -> bold toggle -> drag reposition -> Save. Export downloaded (test_form-edited.pdf, 5483 bytes, %PDF-1.7) with ZERO console/page errors (no fontkit / regeneratorRuntime). Downloaded PDF text extraction returned both 'Signed by John' and 'श्री राम कुमार' as real Devanagari (0 '?' chars) with fonts /Helvetica (Type1) and /Lohit-Devanagari-2000 (Type0) embedded. Delete flows (panel Delete + on-canvas trash) both remove the box and decrement the Save counter (2 -> 1 -> disabled). Regression: Edit Text tab still works (3 pdf-text-run detected, click opens pdf-text-input, edit -> Save exported 'Edited Heading'); Shapes, Insert, Forms and Annotate tabs all open their panels with no errors. Core feature PASSES; only 2 minor polish issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "EditPdfPage - Save button counter", "issue": "changeCount = editedCount + objects.length counts EMPTY text boxes, so 'Save changes (1)' becomes enabled immediately after clicking 'Add a text box' with no text typed. Saving in that state re-exports an unchanged PDF (empty boxes are filtered out in save()). Expected per spec: enabled only once a box has text. Suggest counting only objects with non-empty text (or non-text objects).", "selector": "[data-testid=\"edit-save-button\"]", "priority": "LOW"},
+      {"component": "EditPdfPage - addTextBox()", "issue": "Every new text box is created at the same hardcoded normalized position n{x:0.22,y:0.28}, so adding a 2nd box places it exactly on top of the 1st (verified visually: Hindi box overlapped 'Signed by John'). Add a cascading offset (e.g. +0.03 per existing box) or place at last click point.", "selector": "[data-testid=\"add-text-box-button\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/tool/edit-pdf right panel", "issues": ["Right styling panel is 'hidden lg:block' - on tablet/mobile widths (<1024px) the Annotate panel (and hence add-text-input) is completely unreachable, so the new text-box feature is desktop-only. Consider a mobile drawer.", "Shapes/Insert/Forms panel controls (Rectangle/Line/Highlight, image upload) have no data-testid, unlike the Annotate controls - reduces automated test coverage."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/gen_pdf.py", "/app/tests/check_pdf.py"],
+  "action_items": [
+    "Optional polish: don't count empty text boxes toward changeCount (Save currently enabled with an empty box).",
+    "Optional polish: offset each newly added text box so consecutive boxes don't stack exactly on top of each other.",
+    "Optional: expose the styling panel (Annotate) on <1024px viewports; add data-testids to Shapes/Insert controls."
+  ],
+  "critical_code_review_comments": [
+    "EditPdfPage.jsx is 714 lines and mixes canvas rendering, 4 panel renderers, drag logic and export mapping - consider splitting panels into separate components.",
+    "save() catches all errors into one generic string; the real error is swallowed (no console.error), which will make future export bugs hard to diagnose.",
+    "Edit Text export still only covers the original text with a white rectangle - the original words remain extractable in the output PDF (pre-existing behaviour, not a regression)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (per request)", "frontend": "100% of feature acceptance criteria passed (2 minor polish issues)"},
+  "seed_data_creation": "Generated /tmp/test_form.pdf (A4, fpdf2, English form fields) as upload source; outputs saved to /tmp/edited_out.pdf and /tmp/edited_regression.pdf.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Add-Text-Box feature on /tool/edit-pdf is verified working end-to-end including Hindi Devanagari export (Lohit-Devanagari Type0 embedded, no '?'), drag, resize handle, both delete paths, and no regression on Edit Text / Shapes / Insert / Forms tabs. File input on the tool page has no data-testid - use 'input[type=file]'. Right panel requires viewport width >= 1024px. After Save the editor swaps to a result screen, so click tabs BEFORE saving. Use pypdf (installed) to verify exported text.",
+  "rca_of_the_issue": "No functional defect found. The two minor issues are logic-level: changeCount includes empty text objects (line 150) and addTextBox uses a fixed default position (line 170)."
+}
